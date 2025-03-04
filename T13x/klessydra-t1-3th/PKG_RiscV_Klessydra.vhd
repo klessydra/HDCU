@@ -5,7 +5,7 @@ use ieee.std_logic_misc.all;
 use ieee.numeric_std.all;
 use std.textio.all;
 use ieee.math_real.all;
-
+--
 -- local packages
 
 package riscv_klessydra is
@@ -24,11 +24,11 @@ package riscv_klessydra is
   -- instruction trace file
   file file_handler : text open write_mode is "execution_trace.txt";
 
-  --file file_handler0 : text open write_mode is "execution_0.txt";
+  file file_handler0 : text open write_mode is "execution_0.txt";
 
-  --file file_handler1 : text open write_mode is "execution_1.txt";
+  file file_handler1 : text open write_mode is "execution_1.txt";
 
-  --file file_handler2 : text open write_mode is "execution_2.txt";
+  file file_handler2 : text open write_mode is "execution_2.txt";
 
 
 ------------------------------------------------------------------------------------------------------------
@@ -39,45 +39,39 @@ package riscv_klessydra is
 --  ╚██████╗╚██████╔╝███████║   ██║   ╚██████╔╝██║ ╚═╝ ██║       ██║      ██║   ██║     ███████╗███████║  --
 --   ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝       ╚═╝      ╚═╝   ╚═╝     ╚══════╝╚══════╝  --
 ------------------------------------------------------------------------------------------------------------
-  type array_2d     is array (integer range<>) of std_logic_vector;
-  type array_2d_std is array (integer range<>) of std_logic;
-  type array_3d     is array (integer range<>) of array_2d;
-  type array_4d     is array (integer range<>) of array_3d;
-  type array_2d_int is array (integer range<>) of integer;
-  type array_2d_nat is array (integer range<>) of natural;
-  type array_3d_int is array (integer range<>) of array_2d_int;
-  type array_4d_int is array (integer range<>) of array_3d_int;
-  
-  -- Custom types for dividers
-  type array_2d_int_div_32 is array (integer range<>) of integer range -1 to 31;
-  type array_2d_int_div_16 is array (integer range<>) of integer range -1 to 15;
-  type array_2d_int_div_8  is array (integer range<>) of integer range -1 to 7;
-  type array_3d_int_div_32 is array (integer range<>) of array_2d_int_div_32;
-  type array_3d_int_div_16 is array (integer range<>) of array_2d_int_div_16;
-  type array_3d_int_div_8  is array (integer range<>) of array_2d_int_div_8;
 
-  type fsm_IE_states is (sleep, normal, csr_instr_wait_state);
+  type array_2d           is array (integer range<>) of std_logic_vector;
+  type array_2d_int       is array (integer range<>) of integer;
+  type array_2d_csnt_int  is array (integer range<>) of integer range 0 to 24;
+  type array_2d_shift_int is array (integer range<>) of integer range 0 to 7;
+  type array_2d_int_sim   is array (integer range<>) of integer range 0 to 8192;
+
+  type array_3d           is array (integer range<>) of array_2d;
+  type array_3d_int       is array (integer range<>) of array_2d_int;
+  type array_3d_csnt_int  is array (integer range<>) of array_2d_csnt_int;  
+
+  type CountArray         is array (integer range<>) of std_logic_vector; 
+  type CountArray2d       is array (integer range<>) of CountArray;
+  type CountArray3d       is array (integer range<>) of CountArray2d;
+
+  
+  type fsm_IE_states is (sleep, reset, normal, csr_instr_wait_state, debug);
   type mulh_states   is (init, mult, accum);
   type mul_states    is (mult, accum);
   type div_states    is (init, divide);
   type fsm_LS_states is (normal , data_valid_waiting);
 
-  -- The DSP unit states are defined here
-  constant dsp_init                : std_logic_vector(1 downto 0) := "00";
-  constant dsp_halt_hart           : std_logic_vector(1 downto 0) := "01";
-  constant dsp_exec                : std_logic_vector(1 downto 0) := "10";
+  -- The HDC unit states are defined here
+  constant hdc_init                : std_logic_vector(1 downto 0) := "00";
+  constant hdc_halt_hart           : std_logic_vector(1 downto 0) := "01";
+  constant hdc_exec                : std_logic_vector(1 downto 0) := "10";
 
-  constant THREAD_POOL_BASELINE    : integer := 3;
   constant THREAD_ID_SIZE          : integer := 4;
   constant NOP_POOL_SIZE           : integer := 2;
   constant BRANCHING_DELAY_SLOT    : integer := 3;
   --constant HARC_SIZE               : integer := THREAD_POOL_SIZE;
-
-  constant SLEEP_MODE              : natural := 0;
-  constant SINGLE_HART_MODE        : natural := 1;
-  constant DUAL_HART_MODE          : natural := 2;
-  constant IMT_MODE                : natural := THREAD_POOL_BASELINE;
-
+  -- 
+  constant COUNTER_BITS             : integer := 4;
 -------------------------------------------------------------------------------------------------
 --  ███████╗██╗  ██╗███████╗ ██████╗    ██████╗ ███████╗███████╗██╗███╗   ██╗███████╗███████╗  --
 --  ██╔════╝╚██╗██╔╝██╔════╝██╔════╝    ██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝██╔════╝  --
@@ -87,12 +81,9 @@ package riscv_klessydra is
 --  ╚══════╝╚═╝  ╚═╝╚══════╝ ╚═════╝    ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝  --
 -------------------------------------------------------------------------------------------------
 
-  constant EXEC_UNIT_INSTR_SET_SIZE   : natural := 52;  -- total number of instructions in the exec unit
-  constant LS_UNIT_INSTR_SET_SIZE     : natural := 14;  -- total number of instructions in the ld_str unit
-  constant DSP_UNIT_INSTR_SET_SIZE    : natural := 35;  -- total number of instructions in the dsp unit
-  constant BRANCHING_INSTR_SET_SIZE   : natural := 3;   -- total number of instructions in the dsp unit
-  constant FP_UNIT_INSTR_SET_SIZE     : natural := 6;   -- total number of instructions in the dsp unit
-
+  constant EXEC_UNIT_INSTR_SET_SIZE : natural := 52;  -- total number of instructions in the exec unit
+  constant LS_UNIT_INSTR_SET_SIZE   : natural := 12;  -- total number of instructions in the ld_str unit
+  constant HDC_UNIT_INSTR_SET_SIZE  : natural := 17;  -- total number of instructions in the HDC unit
 
 
   -- EXEC UNIT INSTR SET --------------------------------------------------------------------------------------------------------------------
@@ -150,75 +141,49 @@ package riscv_klessydra is
   constant REMU_pattern    : std_logic_vector(EXEC_UNIT_INSTR_SET_SIZE-1 downto 0) := "1000000000000000000000000000000000000000000000000000";
   -------------------------------------------------------------------------------------------------------------------------------------------
 
-  -- BRANCHING INSTRUCTIONS in FETCH unit -------------------------------------------------------
-  constant JAL_FETCH_pattern    : std_logic_vector(BRANCHING_INSTR_SET_SIZE-1 downto 0) := "001";
-  constant JALR_FETCH_pattern   : std_logic_vector(BRANCHING_INSTR_SET_SIZE-1 downto 0) := "010";
-  constant BRANCH_FETCH_pattern : std_logic_vector(BRANCHING_INSTR_SET_SIZE-1 downto 0) := "100";
-  -----------------------------------------------------------------------------------------------
-
   -- LOAD STORE UNIT INSTR SET ---------------------------------------------------------------------
-  constant LW_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000001";
-  constant LH_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000010";
-  constant LHU_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000100";
-  constant LB_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000001000";
-  constant LBU_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000010000";
-  constant SW_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000100000";
-  constant SH_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000001000000";
-  constant SB_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000010000000";
-  constant FLW_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000100000000";
-  constant FSW_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00001000000000";
-  constant AMOSWAP_pattern  : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00010000000000";
-  constant KMEMLD_pattern   : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "00100000000000";
-  constant KMEMSTR_pattern  : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "01000000000000";
-  constant KBCASTLD_pattern : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "10000000000000";
+  constant LW_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000000001";
+  constant LH_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000000010";
+  constant LHU_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000000100";
+  constant LB_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000001000";
+  constant LBU_pattern      : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000010000";
+  constant SW_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000000100000";
+  constant SH_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000001000000";
+  constant SB_pattern       : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000010000000";
+  constant AMOSWAP_pattern  : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "000100000000";
+  constant HVMEMLD_pattern  : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "001000000000";
+  constant HVMEMSTR_pattern : std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "010000000000";
+  constant HVBCASTLD_pattern: std_logic_vector(LS_UNIT_INSTR_SET_SIZE-1 downto 0) := "100000000000";
   --------------------------------------------------------------------------------------------------
 
-  -- FLOAT UNIT INSTR SET --------------------------------------------------------------------------
-  constant FADD_pattern     : std_logic_vector(FP_UNIT_INSTR_SET_SIZE-1 downto 0) := "000001";
-  constant FSUB_pattern     : std_logic_vector(FP_UNIT_INSTR_SET_SIZE-1 downto 0) := "000010";
-  constant FMUL_pattern     : std_logic_vector(FP_UNIT_INSTR_SET_SIZE-1 downto 0) := "000100";
-  constant FDIV_pattern     : std_logic_vector(FP_UNIT_INSTR_SET_SIZE-1 downto 0) := "001000";
-  --------------------------------------------------------------------------------------------------
+  -- KADDV    --> HVBUNDLE
+  -- KSUBV    --> HVSIM
+  -- KVMUL    --> HVBIND
+  -- KSVADDRF --> HVCLIP
+  -- KSVMULRF --> HVPERM
+  -- KDOTP    --> HVSEARCH
 
-
-  -- DSP UNIT INSTR SET ------------------------------------------------------------------------------------
-  constant KADDV_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000000001";
-  constant KSUBV_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000000010";
-  constant KVMUL_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000000100";
-  constant KVRED_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000001000";
-  constant KDOTP_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000010000";
-  constant KSVADDSC_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000000100000";
-  constant KSVADDRF_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000001000000";
-  constant KSVMULSC_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000010000000";
-  constant KSVMULRF_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000000100000000";
-  constant KSRAV_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000001000000000";
-  constant KSRLV_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000010000000000";
-  constant KBCAST_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000000100000000000";
-  constant KRELU_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000001000000000000";
-  constant KDOTPPS_pattern    : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000010000000000000";
-  constant KVSLT_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000000100000000000000";
-  constant KSVSLT_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000001000000000000000";
-  constant KVCP_pattern       : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000010000000000000000";
-  constant KVDIV_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000000100000000000000000";
-  constant KSVDIVSC_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000001000000000000000000";
-  constant KSVDIVRF_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000010000000000000000000";
-  constant KVREM_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000100000000000000000000";
-  constant KSVREMSC_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000001000000000000000000000";
-  constant KSVREMRF_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000010000000000000000000000";
-  constant KVMULPS_pattern    : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000100000000000000000000000";
-  constant KSVMULPSSC_pattern : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000001000000000000000000000000";
-  constant KSVMULPSRF_pattern : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000010000000000000000000000000";
-  constant KDOTPS_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000100000000000000000000000000";
-  constant HVBUNDLE_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000001000000000000000000000000000";
-  constant HVCLIP_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000010000000000000000000000000000";
-  constant HVBIND_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000100000000000000000000000000000";
-  constant HVPERM_pattern     : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00001000000000000000000000000000000";
-  constant HVSIM_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0)  :="00010000000000000000000000000000000";
-  constant HVSEARCH_pattern   : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "00100000000000000000000000000000000";
-  constant HVENC_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "01000000000000000000000000000000000";
-  constant HVDEC_pattern      : std_logic_vector(DSP_UNIT_INSTR_SET_SIZE-1 downto 0) := "10000000000000000000000000000000000";
+  -- HDC UNIT INSTR SET-------------------------------------------------------------------------------------
+  constant HVBUNDLE_pattern   : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000001";
+  constant HVSIM_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000010";
+  constant HVBIND_pattern     : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000000100";
+  constant KVRED_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000001000";
+  constant HVSEARCH_pattern   : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000010000";
+  constant KSVADDSC_pattern   : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000000100000";
+  constant HVCLIP_pattern     : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000001000000";
+  constant KSVMULSC_pattern   : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000010000000";
+  constant HVPERM_pattern     : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000000100000000";
+  constant KSRAV_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000001000000000";
+  constant KSRLV_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000010000000000";
+  constant KBCAST_pattern     : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00000100000000000";
+  constant KRELU_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00001000000000000";
+  constant KDOTPPS_pattern    : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00010000000000000";
+  constant KVSLT_pattern      : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "00100000000000000";
+  constant KSVSLT_pattern     : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "01000000000000000";
+  constant KVCP_pattern       : std_logic_vector(HDC_UNIT_INSTR_SET_SIZE-1 downto 0) := "10000000000000000";
   ----------------------------------------------------------------------------------------------------------
 
+  -- EXEC UNIT BIT POSITION -----------------------------------------------------------------------------------
   constant ADDI_bit_position    : natural := 0;
   constant SLTI_bit_position    : natural := 1;
   constant SLTIU_bit_position   : natural := 2;
@@ -272,59 +237,38 @@ package riscv_klessydra is
   constant REM_bit_position     : natural := 50;
   constant REMU_bit_position    : natural := 51;
 
-  constant LW_bit_position         : natural := 0;
-  constant LH_bit_position         : natural := 1;
-  constant LHU_bit_position        : natural := 2;
-  constant LB_bit_position         : natural := 3;
-  constant LBU_bit_position        : natural := 4;
-  constant SW_bit_position         : natural := 5;
-  constant SH_bit_position         : natural := 6;
-  constant SB_bit_position         : natural := 7;
-  constant FLW_bit_position        : natural := 8;
-  constant FSW_bit_position        : natural := 9;
-  constant AMOSWAP_bit_position    : natural := 10;
-  constant KMEMLD_bit_position     : natural := 11;
-  constant KMEMSTR_bit_position    : natural := 12;
-  constant KBCASTLD_bit_position   : natural := 13;
-  constant KADDV_bit_position      : natural := 0;
-  constant KSUBV_bit_position      : natural := 1;
-  constant KVMUL_bit_position      : natural := 2;
-  constant KVRED_bit_position      : natural := 3;
-  constant KDOTP_bit_position      : natural := 4;
-  constant KSVADDSC_bit_position   : natural := 5;
-  constant KSVADDRF_bit_position   : natural := 6;
-  constant KSVMULSC_bit_position   : natural := 7;
-  constant KSVMULRF_bit_position   : natural := 8;
-  constant KSRAV_bit_position      : natural := 9;
-  constant KSRLV_bit_position      : natural := 10;
-  constant KBCAST_bit_position     : natural := 11;
-  constant KRELU_bit_position      : natural := 12;
-  constant KDOTPPS_bit_position    : natural := 13;
-  constant KVSLT_bit_position      : natural := 14;
-  constant KSVSLT_bit_position     : natural := 15;
-  constant KVCP_bit_position       : natural := 16;
-  constant KVDIV_bit_position      : natural := 17;
-  constant KSVDIVSC_bit_position   : natural := 18;
-  constant KSVDIVRF_bit_position   : natural := 19;
-  constant KVREM_bit_position      : natural := 20;
-  constant KSVREMSC_bit_position   : natural := 21;
-  constant KSVREMRF_bit_position   : natural := 22;
-  constant KVMULPS_bit_position    : natural := 23;
-  constant KSVMULPSSC_bit_position : natural := 24;
-  constant KSVMULPSRF_bit_position : natural := 25;
-  constant KDOTPS_bit_position     : natural := 26;
-  constant HVBUNDLE_bit_position   : natural := 27;
-  constant HVCLIP_bit_position     : natural := 28;
-  constant HVBIND_bit_position     : natural := 29;
-  constant HVPERM_bit_position     : natural := 30;
-  constant HVSIM_bit_position      : natural := 31;
-  constant HVSEARCH_bit_position   : natural := 32;
-  constant HVENC_bit_position      : natural := 33;
-  constant HVDEC_bit_position      : natural := 34;
+  -- LD-STR UNIT BIT POSITION -----------------------------------------------------------------------------------
+  constant LW_bit_position       : natural := 0;
+  constant LH_bit_position       : natural := 1;
+  constant LHU_bit_position      : natural := 2;
+  constant LB_bit_position       : natural := 3;
+  constant LBU_bit_position      : natural := 4;
+  constant SW_bit_position       : natural := 5;
+  constant SH_bit_position       : natural := 6;
+  constant SB_bit_position       : natural := 7;
+  constant AMOSWAP_bit_position  : natural := 8;
+  constant HVMEMLD_bit_position   : natural := 9;
+  constant HVMEMSTR_bit_position  : natural := 10;
+  constant HVBCASTLD_bit_position : natural := 11;
 
-  constant JAL_FETCH_instr       : natural := 0;
-  constant JALR_FETCH_instr      : natural := 1;
-  constant BRANCH_FETCH_instr    : natural := 2;
+  -- HDC UNIT BIT POSITION -----------------------------------------------------------------------------------
+  constant HVBUNDLE_bit_position : natural := 0;
+  constant HVSIM_bit_position    : natural := 1;
+  constant HVBIND_bit_position   : natural := 2;
+  constant KVRED_bit_position    : natural := 3;
+  constant HVSEARCH_bit_position : natural := 4;
+  constant KSVADDSC_bit_position : natural := 5;
+  constant HVCLIP_bit_position   : natural := 6;
+  constant KSVMULSC_bit_position : natural := 7;
+  constant HVPERM_bit_position   : natural := 8;
+  constant KSRAV_bit_position    : natural := 9;  
+  constant KSRLV_bit_position    : natural := 10;
+  constant KBCAST_bit_position   : natural := 11;
+  constant KRELU_bit_position    : natural := 12;
+  constant KDOTPPS_bit_position  : natural := 13;
+  constant KVSLT_bit_position    : natural := 14;
+  constant KSVSLT_bit_position   : natural := 15;
+  constant KVCP_bit_position     : natural := 16;
 
 -----------------------------------------------------------------------------------------
 --   ██████╗███████╗██████╗     ██████╗ ███████╗███████╗██╗███╗   ██╗███████╗███████╗  --
@@ -349,16 +293,16 @@ package riscv_klessydra is
   constant BADADDR_addr       : std_logic_vector (11 downto 0) := x"343";
   constant MIRQ_addr          : std_logic_vector (11 downto 0) := x"FC0";
   --Performance Counters CSR addresses
-  constant MCYCLE_addr        : std_logic_vector (11 downto 0) := x"B00"; -- clock cycle count
-  constant MINSTRET_addr      : std_logic_vector (11 downto 0) := x"B02"; -- instruction retire count
-  constant MHPMCOUNTER3_addr  : std_logic_vector (11 downto 0) := x"B03"; -- load store access stall count
+  constant MCYCLE_addr        : std_logic_vector (11 downto 0) := x"B00";
+  constant MINSTRET_addr      : std_logic_vector (11 downto 0) := x"B02";
+  constant MHPMCOUNTER3_addr  : std_logic_vector (11 downto 0) := x"B03";
   constant MHPMCOUNTER4_addr  : std_logic_vector (11 downto 0) := x"B04";
   constant MHPMCOUNTER5_addr  : std_logic_vector (11 downto 0) := x"B05";
-  constant MHPMCOUNTER6_addr  : std_logic_vector (11 downto 0) := x"B06"; -- load count
-  constant MHPMCOUNTER7_addr  : std_logic_vector (11 downto 0) := x"B07"; -- store count
-  constant MHPMCOUNTER8_addr  : std_logic_vector (11 downto 0) := x"B08"; -- unconditional count
-  constant MHPMCOUNTER9_addr  : std_logic_vector (11 downto 0) := x"B09"; -- branch count
-  constant MHPMCOUNTER10_addr : std_logic_vector (11 downto 0) := x"B0A"; -- taken branch count
+  constant MHPMCOUNTER6_addr  : std_logic_vector (11 downto 0) := x"B06";
+  constant MHPMCOUNTER7_addr  : std_logic_vector (11 downto 0) := x"B07";
+  constant MHPMCOUNTER8_addr  : std_logic_vector (11 downto 0) := x"B08";
+  constant MHPMCOUNTER9_addr  : std_logic_vector (11 downto 0) := x"B09";
+  constant MHPMCOUNTER10_addr : std_logic_vector (11 downto 0) := x"B0A";
   constant MHPMCOUNTER11_addr : std_logic_vector (11 downto 0) := x"B0B";
   constant MHPMCOUNTER12_addr : std_logic_vector (11 downto 0) := x"B0C";
   constant MHPMCOUNTER13_addr : std_logic_vector (11 downto 0) := x"B0D";
@@ -370,7 +314,7 @@ package riscv_klessydra is
   constant MHPMCOUNTER19_addr : std_logic_vector (11 downto 0) := x"B13";
   constant MHPMCOUNTER20_addr : std_logic_vector (11 downto 0) := x"B14";
   constant MHPMCOUNTER21_addr : std_logic_vector (11 downto 0) := x"B15";
-  constant MHPMCOUNTER22_addr : std_logic_vector (11 downto 0) := x"B16"; -- branch hit count
+  constant MHPMCOUNTER22_addr : std_logic_vector (11 downto 0) := x"B16";
   constant MHPMCOUNTER23_addr : std_logic_vector (11 downto 0) := x"B17";
   constant MHPMCOUNTER24_addr : std_logic_vector (11 downto 0) := x"B18";
   constant MHPMCOUNTER25_addr : std_logic_vector (11 downto 0) := x"B19";
@@ -411,12 +355,11 @@ package riscv_klessydra is
   constant MHPMEVENT29_addr   : std_logic_vector (11 downto 0) := x"33D";
   constant MHPMEVENT30_addr   : std_logic_vector (11 downto 0) := x"33E";
   constant MHPMEVENT31_addr   : std_logic_vector (11 downto 0) := x"33F";
+
   -- Custom Klessydra CSR addresses
-  constant MPSCLFAC_addr      : std_logic_vector (11 downto 0) := x"BE0";  -- custom CSR registers
-  constant MVSIZE_addr        : std_logic_vector (11 downto 0) := x"BF0";  -- custom CSR registers
-  constant MVTYPE_addr        : std_logic_vector (11 downto 0) := x"BF8";  -- custom CSR registers
-  constant MBHARTID_addr      : std_logic_vector (11 downto 0) := x"FC4";  -- custom CSR registers
-  constant MPIP_addr          : std_logic_vector (11 downto 0) := x"FC8";  -- custom CSR registers
+  constant MPSCLFAC_addr      : std_logic_vector (11 downto 0) := x"BE0";
+  constant MVSIZE_addr        : std_logic_vector (11 downto 0) := x"BF0";
+  constant MVTYPE_addr        : std_logic_vector (11 downto 0) := x"BF8";
 
   -- reset values of CSR Registers
   constant MTVEC_RESET_VALUE    : std_logic_vector(31 downto 0)          := x"00000094";
@@ -460,12 +403,8 @@ package riscv_klessydra is
   constant MISC_MEM : std_logic_vector(6 downto 0) := "0001111";
   constant SYSTEM   : std_logic_vector(6 downto 0) := "1110011";
   constant AMO      : std_logic_vector(6 downto 0) := "0101111";
-  constant LOAD_F   : std_logic_vector(6 downto 0) := "0000111";
-  constant STORE_F  : std_logic_vector(6 downto 0) := "0100111";
-  constant FLOAT    : std_logic_vector(6 downto 0) := "1010011";
-  constant KMEM     : std_logic_vector(6 downto 0) := "0001011";
-  constant KDSP     : std_logic_vector(6 downto 0) := "0101011";
-  constant HDCU     : std_logic_vector(6 downto 0) := "1011011";
+  constant HVMEM    : std_logic_vector(6 downto 0) := "0001011";
+  constant HDCU     : std_logic_vector(6 downto 0) := "0101011";
 
   -- funct3 bits of OP_IMM opcode
   constant ADDI      : std_logic_vector(2 downto 0) := "000";
@@ -528,12 +467,6 @@ package riscv_klessydra is
   -- funct3 bits of AMO opcode
   constant SINGLE : std_logic_vector(2 downto 0) := "010";
 
-  -- funct7 bits of FLOAT opcode
-  constant FADD     : std_logic_vector(6 downto 0) := "0000000";
-  constant FSUB     : std_logic_vector(6 downto 0) := "0000100";
-  constant FMUL     : std_logic_vector(6 downto 0) := "0001000";
-  constant FDIV     : std_logic_vector(6 downto 0) := "0001100";
-
   -- funct3 bits of KLESS opcode
   constant KARITH8     : std_logic_vector(2 downto 0) := "000";
   constant KARITH16    : std_logic_vector(2 downto 0) := "001";
@@ -571,21 +504,27 @@ package riscv_klessydra is
 
 
   --funct7 bits for KMEM Instr
-  constant KMEMLD   : std_logic_vector(6 downto 0) := "0000000";
-  constant KMEMSTR  : std_logic_vector(6 downto 0) := "0000001";
-  constant KBCASTLD : std_logic_vector(6 downto 0) := "0000010";
+  
+  -- constant KMEMLD   : std_logic_vector(6 downto 0) := "0000000";
+  -- constant KMEMSTR  : std_logic_vector(6 downto 0) := "0000001";
+
+  --funct7 bits for HVMEM Instr
+  constant HVMEMLD   : std_logic_vector(6 downto 0) := "0000000";
+  constant HVMEMSTR  : std_logic_vector(6 downto 0) := "0000001";
+  constant HVBCASTLD : std_logic_vector(6 downto 0) := "0000010";
 
   --funct7 bits for KREG Instr
-  -- DSP
-  constant KADDV    : std_logic_vector(6 downto 0) := "0000001";
-  constant KSUBV    : std_logic_vector(6 downto 0) := "0000010";
-  constant KVMUL    : std_logic_vector(6 downto 0) := "0000100";
+  constant HVBUNDLE : std_logic_vector(6 downto 0) := "0000001";
+  constant HVSIM    : std_logic_vector(6 downto 0) := "0000010";
+  constant HVBIND   : std_logic_vector(6 downto 0):= "0000100";
+  constant HVCLIP   : std_logic_vector(6 downto 0) := "0001101";
+  constant HVPERM   : std_logic_vector(6 downto 0) := "0001111";
+  
+  -- Da eliminare
   constant KVRED    : std_logic_vector(6 downto 0) := "0000110";
   constant KDOTP    : std_logic_vector(6 downto 0) := "0001000";
   constant KSVADDSC : std_logic_vector(6 downto 0) := "0001100";
-  constant KSVADDRF : std_logic_vector(6 downto 0) := "0001101";
   constant KSVMULSC : std_logic_vector(6 downto 0) := "0001110";
-  constant KSVMULRF : std_logic_vector(6 downto 0) := "0001111";
   constant KSRAV    : std_logic_vector(6 downto 0) := "0010000";
   constant KSRLV    : std_logic_vector(6 downto 0) := "0010001";
   constant KRELU    : std_logic_vector(6 downto 0) := "0011000";
@@ -594,25 +533,6 @@ package riscv_klessydra is
   constant KSVSLT   : std_logic_vector(6 downto 0) := "0011100";
   constant KBCAST   : std_logic_vector(6 downto 0) := "0011110";
   constant KVCP     : std_logic_vector(6 downto 0) := "0011111";
-  constant KVDIV    : std_logic_vector(6 downto 0) := "0100000";
-  constant KSVDIVSC : std_logic_vector(6 downto 0) := "0100001";
-  constant KSVDIVRF : std_logic_vector(6 downto 0) := "0100010";
-  constant KVREM    : std_logic_vector(6 downto 0) := "0100011";
-  constant KSVREMSC : std_logic_vector(6 downto 0) := "0100100";
-  constant KSVREMRF : std_logic_vector(6 downto 0) := "0100101";
-  constant KVMULPS  : std_logic_vector(6 downto 0) := "0100111";
-  constant KSVMULPSSC : std_logic_vector(6 downto 0) := "0101000";
-  constant KSVMULPSRF : std_logic_vector(6 downto 0) := "0101001";
-  constant KDOTPS     : std_logic_vector(6 downto 0) := "0101010";
-  -- HDCU
-  constant HVBUNDLE  : std_logic_vector(6 downto 0) := "0101011";
-  constant HVCLIP    : std_logic_vector(6 downto 0) := "0101100";
-  constant HVBIND    : std_logic_vector(6 downto 0) := "0101101";
-  constant HVPERM    : std_logic_vector(6 downto 0) := "0101110";
-  constant HVSIM     : std_logic_vector(6 downto 0) := "0101111";
-  constant HVSEARCH  : std_logic_vector(6 downto 0) := "0110000";
-  constant HVENC     : std_logic_vector(6 downto 0) := "0110001";
-  constant HVDEC     : std_logic_vector(6 downto 0) := "0110010";
 
   -- instr. to change privilege level & interrupt-management instruction
   -- funct12 bits for instructions SYSTEM -> PRIV:
@@ -643,7 +563,6 @@ package riscv_klessydra is
   constant SCRATCHPAD_OVERFLOW_EXCEPT_CODE   : std_logic_vector(31 downto 0) := x"00000102"; -- Custom codes
   constant READ_SAME_SCARTCHPAD_EXCEPT_CODE  : std_logic_vector(31 downto 0) := x"00000103"; -- Custom codes
   constant WRITE_SAME_SCARTCHPAD_EXCEPT_CODE : std_logic_vector(31 downto 0) := x"00000104"; -- Custom codes
-  constant CTX_SWITCH_CODE                   : std_logic_vector(31 downto 0) := x"00000110"; -- Custom codes
 
 
 ----------------------------------------------------------------------------------
@@ -653,7 +572,8 @@ package riscv_klessydra is
 --  ██╔══╝  ██║   ██║██║╚██╗██║██║        ██║   ██║██║   ██║██║╚██╗██║╚════██║  --
 --  ██║     ╚██████╔╝██║ ╚████║╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║███████║  --
 --  ╚═╝      ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝  --
----------------------------------------------------------------------------------- 
+----------------------------------------------------------------------------------                                                                        
+
   -- functions --
 
   --function aq(signal instr : in std_logic_vector(31 downto 0)) return std_logic;
@@ -663,7 +583,6 @@ package riscv_klessydra is
 --  function rs2(signal instr : in std_logic_vector(31 downto 0)) return integer;
 --  function rd(signal instr  : in std_logic_vector(31 downto 0)) return integer;
 
-  function or_vect_bits(input_vector : in std_logic_vector)              return std_logic;
   function I_immediate(signal instr  : in std_logic_vector(31 downto 0)) return std_logic_vector;
   function S_immediate(signal instr  : in std_logic_vector(31 downto 0)) return std_logic_vector;
   function B_immediate(signal instr  : in std_logic_vector(31 downto 0)) return std_logic_vector;
@@ -709,15 +628,6 @@ package body riscv_klessydra is
   --begin
   --  return to_integer(unsigned(instr(11+(RF_CEIL-1) downto 7)));
   --end;
-
-  function or_vect_bits(input_vector : std_logic_vector) return std_logic is
-    variable result : std_logic := '0';
-  begin
-    for i in input_vector'range loop
-      result := result or input_vector(i);
-    end loop;
-    return result;
-  end function or_vect_bits;
 
   function I_immediate(signal instr : in std_logic_vector(31 downto 0)) return std_logic_vector is
   begin
