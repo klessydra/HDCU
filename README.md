@@ -48,29 +48,25 @@ Table II summarizes the parameters that can be tuned at synthesis time and at ru
 
 ## ⚙️ Getting Started
 
-The accelerator can be downloaded and deployed in Klessydra by following these steps:
+Follow these steps to download and deploy the accelerator in the Klessydra environment:
 
-- **Install the Toolchain:**
-  - Clone the [RISC-V GNU Toolchain with Klessydra Instruction Extensions](https://github.com/klessydra/riscv-gnu-toolchain).
-  - Replace the original `riscv-opc.c` and `riscv-opc.h` files in the cloned repository with those provided in this repository to enable the new accelerator-specific instructions.
-  - Build the modified toolchain.
+### 1. Install the Toolchain
+- Clone the [RISC-V GNU Toolchain with Klessydra Instruction Extensions](https://github.com/klessydra/riscv-gnu-toolchain).
+- Replace the original `riscv-opc.c` and `riscv-opc.h` files in the cloned repository with those provided in this repository to enable the accelerator-specific instructions.
+- Build the modified toolchain.
 
-- **Acquire the Klessydra Core:**
-  - Clone the [Klessydra core](https://github.com/klessydra/pulpino-klessydra).
+### 2. Acquire the Klessydra Core
+- Clone the [Klessydra core](https://github.com/klessydra/pulpino-klessydra).
+- Follow the provided tutorial to set up the `pulpino-klessydra` environment.
 
-- **Apply the Patch:**
-  - Replace the `pulpino-klessydra/ips/T13x` folder with the patched version available in this repo.
+### 3. Apply the Patch
+- Replace the `pulpino-klessydra/ips/T13x` directory with the patched version available in this repository.
+- Copy the `hdc_libs` folder into the `pulpino-klessydra/sw/libs` directory.
+- Copy the `klessydra_t13h_hdcu_tests` folder into the `pulpino-klessydra/sw/apps` directory.
+- Replace the `dsp_functions.h` file in `pulpino-klessydra/sw/libs/klessydra_libs/dsp_libs/inc` with the version provided in this repository.
 
-- **Integrate the HDC Software Library:**
-  - Insert the `hdc_libs` folder into the `pulpino-klessydra/sw/libs` directory.
+_Stay tuned! A fully automated installation procedure and a more detailed guide will be available soon. For assistance, feel free to contact us._
 
-- **Insert Predefined Tests:**
-  - Copy the `klessydra_t13h_hdcu_tests` folder into the `pulpino-klessydra/sw/apps` directory.
-
-- **Integrate the dsp_functions.h:**
-  - Replace the `dsp_functions.h` file present in `pulpino-klessydra/sw/libs/klessydra_libs/dsp_libs/inc ` with the version available in this repo.
-
-_Stay tuned! A fully automated installation procedure and a more detailed guide will be available soon. For any assistance, please feel free to contact us._
 
 
 ## 📂 Project Structure
