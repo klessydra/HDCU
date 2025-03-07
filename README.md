@@ -47,22 +47,41 @@ Table II summarizes the parameters that can be tuned at synthesis time and at ru
 </p>
 
 ## ⚙️ Getting Started
-The accelerator can be downloaded and deployed in Klessydra with the following steps:
-- **Install the Toolchain:** Download and build the [RISC-V GNU Toolchain with the Klessydra Instruction Extensions](https://github.com/klessydra/riscv-gnu-toolchain)
-- **Acquire the Klessydra Core:** Clone the [Klessydra core](https://github.com/klessydra/pulpino-klessydra)
-- **Apply the Patch:** Replace the contents of the Klessydra-t13th folder with the patched version available in this repository.
-- **Integrate the HDC Software Library:** Insert the hdc-libs folder into the pulpino-klessydra/sw/libs directory.
-- **Insert the predefined tests:** Copy the klessydra_t1-3th_hdcu_tests folder into the pulpino-klessydra/sw/apps directory.
-  
+
+The accelerator can be downloaded and deployed in Klessydra by following these steps:
+
+- **Install the Toolchain:**
+  - Clone the [RISC-V GNU Toolchain with Klessydra Instruction Extensions](https://github.com/klessydra/riscv-gnu-toolchain).
+  - Replace the original `riscv-opc.c` and `riscv-opc.h` files in the cloned repository with those provided in this repository to enable the new accelerator-specific instructions.
+  - Build the modified toolchain.
+
+- **Acquire the Klessydra Core:**
+  - Clone the [Klessydra core](https://github.com/klessydra/pulpino-klessydra).
+
+- **Apply the Patch:**
+  - Replace the `pulpino-klessydra/ips/T13x` folder with the patched version available in this repo.
+
+- **Integrate the HDC Software Library:**
+  - Insert the `hdc_libs` folder into the `pulpino-klessydra/sw/libs` directory.
+
+- **Insert Predefined Tests:**
+  - Copy the `klessydra_t13h_hdcu_tests` folder into the `pulpino-klessydra/sw/apps` directory.
+
+- **Integrate the dsp_functions.h:**
+  - Replace the `dsp_functions.h` file present in `pulpino-klessydra/sw/libs/klessydra_libs/dsp_libs/inc ` with the version available in this repo.
+
 _Stay tuned! A fully automated installation procedure and a more detailed guide will be available soon. For any assistance, please feel free to contact us._
 
 
 ## 📂 Project Structure
 ```
 .
-├── T13x-HDCU                 # Hardware design and implementation files for the HDCU
+├── T13x                      # Hardware design and implementation files for the HDCU
 ├── hdc_libs                  # Hyperdimensional Computing software libraries
 ├── klessydra_t13h_hdcu_tests # Test programs and examples for verifying HDCU functionality
+├── dsp_functions.h           # Inline assembly macros and function prototypes for HDC
+├── riscv-opc.c               # Definitions of RISC-V opcode mappings for custom HDCU instructions.
+├── riscv-opc.h               # Header file containing opcode definitions and macros for custom HDCU instructions in RISC-V.
 ├── LICENSE                   # License information
 └── README.md                 # Main project documentation
 ```
