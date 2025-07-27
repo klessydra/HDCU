@@ -25,11 +25,11 @@ The designed HDCU is integrated into the execution stage of the Klessydra-T03 co
 The HDCU operates as a coprocessor in charge of executing HDC operations. In the decode phase of the instruction processing pipeline of the Klessydra T03 core, if the fetched instruction belongs to the HDC ISE and the corresponding acceleration unit is available, the HDCU intervention is requested to handle the operation. The instructions executed by the HDCU operate on HVs contained in local Scratchpad Memories (SPMs), which are designed to be synthesized in Block-RAMs on FPGA and allow adequate bandwidth for the parallel operations on HVs. The size of each SPM can be configured at synthesis time. HVs in the Data Memory are loaded into and from the SPMs through the Scratchpad Memory Interface (SPMI) using two dedicated instructions (hvmemld and hvmemstr).
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/816f5858-6740-45a7-a343-9360c8d3a74a" width="400">
+  <img src="pictures/RTL_Klessydra_HDCU.png" width="400">
 </p>
 The Figure below shows a detailed view of the microarchitecture of the HDCU. The design includes highly optimized functional units for each of the basic HDC arithmetic operations. The hardware parallelism inside each functional unit can be configured at synthesis time using a parameter called SIMD degree (Single Instruction Multiple Data). For instance, setting SIMD equal to 256 replicates the hardware to process 256 HV elements in one clock cycle. This flexibility enables trading off execution time with energy consumption and hardware requirements, allowing the accelerator to adapt to the specific needs of various application scenarios, ranging from embedded systems to high-performance computing. Additionally, each functional unit can be optionally disabled to reduce hardware requirements when necessary, leaving the software execution of the corresponding HDC operation on the core. 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/143314fe-17c7-42d6-a235-f8366b3a4126" width="400">
+   <img src="pictures/RTL_HDCU.png" width="400">
 </p>
 
 Differently from existing solutions in the literature, the HV size in HDCU is not fixed but can be set at runtime by writing into a dedicated Control and Status Register (CSR), denoted as HVSIZE and visible to the software program through the CSR HVSIZE instruction. The value of HVSIZE controls the hardware loops in the functional units. The hardware loops keep the required functional unit busy until HVSIZE elements are processed, avoiding the need for repetitive software loops
@@ -37,13 +37,13 @@ in which the same instructions are repeatedly fetched and decoded.
 
 Table I lists the instructions expressed via the intrinsic function syntax.
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1cdf5f7e-531e-48dd-a928-da533dc36e27" width="400">
+  <img src="pictures/ISE_Table.png" width="400">
 </p>
 
 Table II summarizes the parameters that can be tuned at synthesis time and at runtime.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/bc281b09-9fd3-4043-bad3-74e6f996caf1" width="400">
+  <img src="pictures/Parameter_Table.png" width="400">
 </p>
 
 ## ⚙️ Getting Started
